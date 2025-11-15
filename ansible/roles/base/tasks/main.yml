@@ -1,0 +1,22 @@
+---
+- name: Install base packages
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - jq
+      - unzip
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+- name: Ensure /usr/local/bin exists
+  file:
+    path: /usr/local/bin
+    state: directory
+    mode: '0755'

@@ -1,0 +1,16 @@
+---
+- name: Enable Ingress addon in Minikube
+  command: minikube addons enable ingress
+  become: no
+  become_user: "{{ minikube_user }}"
+  register: ingress_enabled
+  changed_when: "'ingress was successfully enabled' in ingress_enabled.stdout"
+
+- name: Wait for Ingress controller to be ready
+  command: kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=120s
+  become: no
+  become_user: "{{ minikube_user }}"
+  retries: 5
+  delay: 10
+  register: ingress_wait
+  until: ingress_wait.rc == 0

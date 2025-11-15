@@ -1,0 +1,48 @@
+---
+- name: Get VM IP address
+  set_fact:
+    vm_ip: "{{ ansible_default_ipv4.address }}"
+
+- name: Copy Terraform files
+  copy:
+    src: "{{ playbook_dir }}/../terraform/"
+    dest: "/home/{{ minikube_user }}/notes-app-terraform/"
+    owner: "{{ minikube_user }}"
+    group: "{{ minikube_user }}"
+    mode: '0755'
+
+- name: Initialize Terraform
+  command: terraform init
+  args:
+    chdir: "/home/{{ minikube_user }}/notes-app-terraform/"
+  become: no
+  become_user: "{{ minikube_user }}"
+
+- name: Apply Terraform configuration
+  command: terraform apply -auto-approve -var="vm_ip={{ vm_ip }}"
+  args:
+    chdir: "/home/{{ minikube_user }}/notes-app-terraform/"
+  become: no
+  become_user: "{{ minikube_user }}"
+  environment:
+    KUBE_CONFIG_PATH: "/home/{{ minikube_user }}/.kube/config"
+
+- name: Wait for all pods to be ready
+  command: kubectl wait --namespace notes-app --for=condition=ready pod --all --timeout=300s
+  become: no
+  become_user: "{{ minikube_user }}"
+  retries: 5
+  delay: 10
+  register: pods_wait
+  until: pods_wait.rc == 0
+
+- name: Get Ingress details
+  command: kubectl get ingress -n notes-app notes-ingress -o json
+  become: no
+  become_user: "{{ minikube_user }}"
+  register: ingress_details
+  changed_when: false
+
+- name: Display application URL
+  debug:
+    msg: "Application is available at: http://notes.{{ vm_ip }}.nip.io"

@@ -1,0 +1,39 @@
+---
+- name: Enable MetalLB addon in Minikube
+  command: minikube addons enable metallb
+  become: no
+  become_user: "{{ minikube_user }}"
+  register: metallb_enabled
+  changed_when: "'metallb was successfully enabled' in metallb_enabled.stdout"
+
+- name: Get Minikube IP
+  command: minikube ip
+  register: minikube_ip
+  become: no
+  become_user: "{{ minikube_user }}"
+  changed_when: false
+
+- name: Calculate IP range for MetalLB
+  set_fact:
+    metallb_ip_start: "{{ minikube_ip.stdout | regex_replace('(\\d+\\.\\d+\\.\\d+\\.)\\d+', '\\1200') }}"
+    metallb_ip_end: "{{ minikube_ip.stdout | regex_replace('(\\d+\\.\\d+\\.\\d+\\.)\\d+', '\\1250') }}"
+
+- name: Configure MetalLB IP address pool
+  command: |
+    minikube addons configure metallb
+  become: no
+  become_user: "{{ minikube_user }}"
+  environment:
+    METALLB_START_IP: "{{ metallb_ip_start }}"
+    METALLB_END_IP: "{{ metallb_ip_end }}"
+  register: metallb_config
+  failed_when: false
+
+- name: Wait for MetalLB to be ready
+  command: kubectl wait --namespace metallb-system --for=condition=ready pod --selector=app=metallb --timeout=90s
+  become: no
+  become_user: "{{ minikube_user }}"
+  retries: 5
+  delay: 10
+  register: metallb_wait
+  until: metallb_wait.rc == 0
