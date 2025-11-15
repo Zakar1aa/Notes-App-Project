@@ -1,51 +1,23 @@
 ---
-- name: Remove old Docker versions
-  apt:
-    name:
-      - docker
-      - docker-engine
-      - docker.io
-      - containerd
-      - runc
-    state: absent
-
-- name: Add Docker GPG key
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
-    keyring: /etc/apt/keyrings/docker.gpg
-
-- name: Add Docker repository
-  apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-    state: present
-    filename: docker
-
-- name: Install Docker
-  apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-buildx-plugin
-      - docker-compose-plugin
-    state: present
-    update_cache: yes
-
 - name: Add user to docker group
   user:
     name: "{{ ansible_user }}"
     groups: docker
     append: yes
+  become: yes
 
-- name: Start and enable Docker service
-  systemd:
-    name: docker
-    state: started
-    enabled: yes
+- name: Verify Docker is running
+  command: docker info
+  changed_when: false
+  register: docker_info
+  become: no
 
-- name: Wait for Docker socket
-  wait_for:
-    path: /var/run/docker.sock
-    state: present
-    timeout: 30
+- name: Display Docker version
+  command: docker --version
+  changed_when: false
+  register: docker_version
+  become: no
+
+- name: Show Docker version
+  debug:
+    msg: "Docker is ready: {{ docker_version.stdout }}"
