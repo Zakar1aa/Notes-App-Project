@@ -13,28 +13,35 @@
   become: no
   become_user: "{{ minikube_user }}"
 
+- name: Display current Minikube status
+  debug:
+    var: minikube_status.stdout_lines
+
 - name: Delete existing Minikube cluster if exists
   command: minikube delete
-  when: minikube_status.rc == 0
+  when: minikube_status.rc == 0 and 'Running' not in minikube_status.stdout
   become: no
   become_user: "{{ minikube_user }}"
   ignore_errors: yes
 
 - name: Start Minikube with Docker driver
-  command: minikube start --driver=docker --cpus=2 --memory=4096
+  shell: |
+    minikube start --driver=docker --cpus=2 --memory=4096 --container-runtime=docker || \
+    minikube start --driver=docker --cpus=2 --memory=2048 --container-runtime=docker
   become: no
   become_user: "{{ minikube_user }}"
   register: minikube_start
-  retries: 3
-  delay: 10
-  until: minikube_start.rc == 0
+  when: minikube_status.rc != 0 or 'Running' not in minikube_status.stdout
+  environment:
+    HOME: "/home/{{ minikube_user }}"
+    MINIKUBE_IN_STYLE: "false"
 
 - name: Wait for Minikube to be ready
   command: minikube status
   register: minikube_ready
   until: "'Running' in minikube_ready.stdout"
   retries: 10
-  delay: 5
+  delay: 10
   become: no
   become_user: "{{ minikube_user }}"
   changed_when: false
@@ -43,3 +50,15 @@
   command: kubectl config use-context minikube
   become: no
   become_user: "{{ minikube_user }}"
+  changed_when: false
+
+- name: Verify kubectl can connect to cluster
+  command: kubectl cluster-info
+  become: no
+  become_user: "{{ minikube_user }}"
+  register: cluster_info
+  changed_when: false
+
+- name: Display cluster info
+  debug:
+    var: cluster_info.stdout_lines

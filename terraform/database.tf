@@ -29,10 +29,22 @@ resource "kubernetes_config_map" "db_init" {
   }
   
   data = {
-    "init.sql" = file("${path.module}/../app/db/init.sql")
+    "init.sql" = <<-SQL
+      CREATE TABLE IF NOT EXISTS notes (
+          id SERIAL PRIMARY KEY,
+          note TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
+      
+      INSERT INTO notes (note) VALUES 
+          ('Welcome to NotesApp!'),
+          ('This is your first note'),
+          ('You can add, view, and delete notes');
+    SQL
   }
 }
-
 # Secret for database credentials
 resource "kubernetes_secret" "db_credentials" {
   metadata {
